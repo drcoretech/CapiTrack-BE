@@ -12,12 +12,42 @@ const User = require('../models/User');
  * are completely isolated and never shared with other users.
  */
 const getRequestUser = async (req) => {
+  const deviceId = (req.headers['x-device-id'] || '').trim();
   const headerName = req.headers['x-user-name'];
   const queryName = req.query ? req.query.userName : null;
   const bodyName = req.body ? (req.body.userName || req.body.name) : null;
 
   const rawName = (headerName || queryName || bodyName || '').trim();
 
+  // 1. Device-level isolation for Google Play Store installations
+  if (deviceId) {
+    let user = await User.findOne({ deviceId });
+
+    if (user) {
+      if (rawName && user.name !== rawName) {
+        user.name = rawName;
+        await user.save();
+      }
+      return user;
+    }
+
+    // New device installation on Play Store!
+    user = await User.create({
+      deviceId,
+      name: rawName || 'User',
+      preferredLanguage: 'en',
+      currency: 'INR',
+      currencySymbol: '₹',
+      preferences: {
+        autoCaptureEnabled: false,
+        darkMode: false,
+      },
+    });
+
+    return user;
+  }
+
+  // 2. Legacy fallback for requests without x-device-id
   if (rawName) {
     const escaped = rawName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
     let user = await User.findOne({

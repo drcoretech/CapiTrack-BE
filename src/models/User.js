@@ -8,6 +8,12 @@ const userSchema = new mongoose.Schema(
       trim: true,
       default: 'Rohit',
     },
+    deviceId: {
+      type: String,
+      trim: true,
+      index: true,
+      sparse: true,
+    },
     email: {
       type: String,
       trim: true,
