@@ -22,48 +22,7 @@ const formatProject = (p) => ({
 exports.getProjects = async (req, res) => {
   try {
     const user = await getRequestUser(req);
-    let projects = await ClientProject.find({ userId: user._id }).sort({ updatedAt: -1 });
-
-    // If user has no projects yet, auto-populate initial template deals
-    if (projects.length === 0) {
-      const initial = await ClientProject.create([
-        {
-          userId: user._id,
-          clientName: 'Kemlite',
-          projectTitle: 'Kemlite Corporate Website',
-          totalValue: 12000,
-          payments: [
-            {
-              amount: 6000,
-              date: '10 Sep 2026',
-              note: '50% Advance milestone received',
-              method: 'UPI',
-              recordedAsIncome: true,
-            },
-          ],
-          status: 'payment_pending',
-          notes: 'Website design & deployment. 6,000 pending upon final handover.',
-        },
-        {
-          userId: user._id,
-          clientName: 'Audiology Clinic',
-          projectTitle: 'Audiology Appointment Portal',
-          totalValue: 5000,
-          payments: [
-            {
-              amount: 5000,
-              date: '02 Sep 2026',
-              note: 'Full payment received upon completion',
-              method: 'Bank Transfer',
-              recordedAsIncome: true,
-            },
-          ],
-          status: 'completed',
-          notes: 'Completed & handed over. Fully settled.',
-        },
-      ]);
-      projects = initial;
-    }
+    const projects = await ClientProject.find({ userId: user._id }).sort({ updatedAt: -1 });
 
     res.json({
       success: true,
