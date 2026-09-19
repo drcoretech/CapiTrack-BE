@@ -51,7 +51,7 @@ exports.createProject = async (req, res) => {
     const initPay = Number(initialPayment) || 0;
     const payments = [];
     if (initPay > 0) {
-      const nowStr = new Date().toLocaleDateString('en-US', { day: 'numeric', month: 'short', year: 'numeric' });
+      const nowStr = new Date().toISOString();
       payments.push({
         amount: initPay,
         date: nowStr,
@@ -99,7 +99,7 @@ exports.addPayment = async (req, res) => {
       return res.status(404).json({ success: false, message: 'Project not found' });
     }
 
-    const dateStr = new Date().toLocaleDateString('en-US', { day: 'numeric', month: 'short', year: 'numeric' });
+    const dateStr = new Date().toISOString();
     project.payments.unshift({
       amount: payAmount,
       date: dateStr,
