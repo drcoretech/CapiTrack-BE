@@ -1,91 +1,89 @@
+const mongoose = require('mongoose');
 const User = require('../models/User');
 
 /**
  * Resolves the active user based on the request.
- * Checks:
- * 1. 'x-user-name' header
- * 2. 'userName' query parameter
- * 3. Body 'userName' or 'name'
- *
- * If a matching user is found by name (case-insensitive), returns it.
- * If not, creates a fresh user with that name so their expenses and contacts
- * are completely isolated and never shared with other users.
+ * Prioritizes:
+ * 1. 'x-user-id' header or Bearer token (Direct, precise account mapping)
+ * 2. 'x-user-name' header or query/body name (Case-insensitive name matching)
+ * 3. 'x-device-id' header
  */
 const getRequestUser = async (req) => {
-  const deviceId = (req.headers['x-device-id'] || '').trim();
+  // 1. Direct User ID lookup
+  const authHeader = req.headers['authorization'];
+  let tokenUserId = null;
+  if (authHeader && authHeader.startsWith('Bearer ')) {
+    tokenUserId = authHeader.substring(7).trim();
+  }
+  const explicitUserId = (req.headers['x-user-id'] || tokenUserId || '').trim();
+
+  if (explicitUserId && mongoose.Types.ObjectId.isValid(explicitUserId)) {
+    const userById = await User.findById(explicitUserId);
+    if (userById) {
+      return userById;
+    }
+  }
+
+  // 2. Case-insensitive user name lookup
   const headerName = req.headers['x-user-name'];
   const queryName = req.query ? req.query.userName : null;
   const bodyName = req.body ? (req.body.userName || req.body.name) : null;
-
   const rawName = (headerName || queryName || bodyName || '').trim();
 
-  // 1. Device-level isolation for Google Play Store installations
-  if (deviceId) {
-    let user = await User.findOne({ deviceId });
-
-    if (user) {
-      if (rawName && user.name !== rawName) {
-        user.name = rawName;
-        await user.save();
-      }
-      return user;
-    }
-
-    // New device installation on Play Store!
-    user = await User.create({
-      deviceId,
-      name: rawName || 'User',
-      preferredLanguage: 'en',
-      currency: 'INR',
-      currencySymbol: '₹',
-      preferences: {
-        autoCaptureEnabled: false,
-        darkMode: false,
-      },
-    });
-
-    return user;
-  }
-
-  // 2. Legacy fallback for requests without x-device-id
   if (rawName) {
     const escaped = rawName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-    let user = await User.findOne({
+    const userByName = await User.findOne({
       name: { $regex: new RegExp(`^${escaped}$`, 'i') },
     });
-
-    if (!user) {
-      user = await User.create({
-        name: rawName,
-        preferredLanguage: 'en',
-        currency: 'INR',
-        currencySymbol: '₹',
-        preferences: {
-          autoCaptureEnabled: false,
-          darkMode: false,
-        },
-      });
+    if (userByName) {
+      return userByName;
     }
-
-    return user;
   }
 
-  // Fallback to first user in database or create default
-  let user = await User.findOne();
-  if (!user) {
-    user = await User.create({
-      name: 'Digvijay',
+  // 3. Device ID lookup
+  const deviceId = (req.headers['x-device-id'] || '').trim();
+  if (deviceId) {
+    const userByDevice = await User.findOne({ deviceId });
+    if (userByDevice) {
+      return userByDevice;
+    }
+  }
+
+  // 4. Fallback: if name provided, create user
+  if (rawName) {
+    const newUser = await User.create({
+      name: rawName,
       preferredLanguage: 'en',
       currency: 'INR',
       currencySymbol: '₹',
       preferences: {
         autoCaptureEnabled: false,
         darkMode: false,
+        businessTrackingEnabled: false,
+      },
+    });
+    return newUser;
+  }
+
+  // 5. Final fallback to existing user or create initial user
+  let fallbackUser = await User.findOne();
+  if (!fallbackUser) {
+    fallbackUser = await User.create({
+      name: 'User',
+      preferredLanguage: 'en',
+      currency: 'INR',
+      currencySymbol: '₹',
+      preferences: {
+        autoCaptureEnabled: false,
+        darkMode: false,
+        businessTrackingEnabled: false,
       },
     });
   }
 
-  return user;
+  return fallbackUser;
 };
 
-module.exports = { getRequestUser };
+module.exports = {
+  getRequestUser,
+};

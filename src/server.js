@@ -12,6 +12,7 @@ const expenseRoutes = require('./routes/expense.routes');
 const ledgerRoutes = require('./routes/ledger.routes');
 const projectRoutes = require('./routes/project.routes');
 const userRoutes = require('./routes/user.routes');
+const authRoutes = require('./routes/auth.routes');
 const User = require('./models/User');
 
 const app = express();
@@ -46,6 +47,7 @@ app.get('/api/health', (req, res) => {
 });
 
 // Mount Resource Routes
+app.use('/api/auth', authRoutes);
 app.use('/api/dashboard', dashboardRoutes);
 app.use('/api/expenses', expenseRoutes);
 app.use('/api/ledger', ledgerRoutes);
@@ -63,110 +65,9 @@ app.use((err, req, res, next) => {
   res.status(500).json({ success: false, message: err.message || 'Internal server error' });
 });
 
-// Auto-seed helper for initial launch if database is empty
-const autoSeedIfEmpty = async () => {
-  try {
-    const userCount = await User.countDocuments();
-    if (userCount === 0) {
-      console.log('No users found in database. Auto-populating mockup seed data...');
-      const Expense = require('./models/Expense');
-      const Person = require('./models/Person');
-      const LedgerTransaction = require('./models/LedgerTransaction');
-
-      const user = await User.create({
-        name: 'Rohit',
-        currency: 'INR',
-        currencySymbol: '₹',
-        preferredLanguage: 'en',
-      });
-
-      const now = new Date();
-      await Expense.create([
-        {
-          userId: user._id,
-          amount: 150,
-          category: 'Food',
-          icon: '🍔',
-          note: 'Lunch with team',
-          time: '1:20pm',
-          date: new Date(now.getFullYear(), now.getMonth(), now.getDate(), 13, 20),
-        },
-        {
-          userId: user._id,
-          amount: 190,
-          category: 'Travel',
-          icon: '🚕',
-          note: 'Auto to office',
-          time: '9:05am',
-          date: new Date(now.getFullYear(), now.getMonth(), now.getDate(), 9, 5),
-        },
-        {
-          userId: user._id,
-          amount: 210,
-          category: 'Grocery',
-          icon: '🛒',
-          note: 'Groceries',
-          time: '7:40pm',
-          date: new Date(now.getFullYear(), now.getMonth(), now.getDate() - 1, 19, 40),
-        },
-      ]);
-
-      const akssh = await Person.create({
-        userId: user._id,
-        name: 'Akssh',
-        initial: 'A',
-        netBalance: 1400,
-        status: 'pending',
-      });
-      await LedgerTransaction.create({
-        userId: user._id,
-        personId: akssh._id,
-        type: 'LENT',
-        amount: 1400,
-        note: 'Lent — cash',
-      });
-
-      const anurag = await Person.create({
-        userId: user._id,
-        name: 'Anurag',
-        initial: 'A',
-        netBalance: 850,
-        status: 'pending',
-      });
-      await LedgerTransaction.create({
-        userId: user._id,
-        personId: anurag._id,
-        type: 'LENT',
-        amount: 850,
-        note: 'Weekend lunch split',
-      });
-
-      const sahil = await Person.create({
-        userId: user._id,
-        name: 'Sahil',
-        initial: 'S',
-        netBalance: -900,
-        status: 'pending',
-      });
-      await LedgerTransaction.create({
-        userId: user._id,
-        personId: sahil._id,
-        type: 'BORROWED',
-        amount: 900,
-        note: 'Borrowed for cab',
-      });
-
-      console.log('Database successfully seeded with default mockup data.');
-    }
-  } catch (err) {
-    console.warn('Auto-seed warning:', err.message);
-  }
-};
-
 // Start Server (only when running directly, not in Vercel serverless)
 const startServer = async () => {
   await connectDB();
-  await autoSeedIfEmpty();
 
   app.listen(PORT, () => {
     console.log(`CapiTrack API Server running on http://localhost:${PORT}`);
