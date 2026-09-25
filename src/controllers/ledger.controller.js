@@ -8,12 +8,36 @@ exports.getContacts = async (req, res) => {
     const user = await getRequestUser(req);
     const contacts = await Person.find({ userId: user._id }).sort({ lastTransactionAt: -1 });
 
+    const allTransactions = await LedgerTransaction.find({ userId: user._id }).sort({
+      date: -1,
+      createdAt: -1,
+    });
+
+    const txnByPerson = {};
+    for (const t of allTransactions) {
+      if (!t.personId) continue;
+      const pid = t.personId.toString();
+      if (!txnByPerson[pid]) txnByPerson[pid] = [];
+      txnByPerson[pid].push({
+        id: t._id.toString(),
+        note: t.note || (t.type === 'LENT' ? 'Lent' : 'Borrowed'),
+        date: new Date(t.date).toLocaleDateString('en-US', {
+          day: 'numeric',
+          month: 'short',
+          year: 'numeric',
+        }),
+        amount: t.amount,
+        direction: t.type,
+      });
+    }
+
     const formatted = contacts.map((c) => ({
-      id: c._id,
+      id: c._id.toString(),
       name: c.name,
-      initial: c.initial,
-      netBalance: c.netBalance,
-      status: c.status,
+      initial: c.initial || (c.name ? c.name[0].toUpperCase() : '?'),
+      netBalance: c.netBalance || 0,
+      status: c.status || (c.netBalance === 0 ? 'settled' : 'pending'),
+      transactions: txnByPerson[c._id.toString()] || [],
       lastDate: c.lastTransactionAt
         ? new Date(c.lastTransactionAt).toLocaleDateString('en-US', {
             day: 'numeric',
@@ -208,10 +232,35 @@ exports.settleContact = async (req, res) => {
 exports.deleteContact = async (req, res) => {
   try {
     const { id } = req.params;
+    const { name } = req.query;
     const user = await getRequestUser(req);
+    const mongoose = require('mongoose');
 
-    await Person.findOneAndDelete({ _id: id, userId: user._id });
-    await LedgerTransaction.deleteMany({ personId: id, userId: user._id });
+    let deletedPerson = null;
+
+    if (id && mongoose.isValidObjectId(id)) {
+      deletedPerson = await Person.findOneAndDelete({ _id: id, userId: user._id });
+    }
+
+    if (!deletedPerson && name && name.trim()) {
+      deletedPerson = await Person.findOneAndDelete({
+        userId: user._id,
+        name: new RegExp(`^${name.trim().replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i'),
+      });
+    }
+
+    if (!deletedPerson && id && typeof id === 'string') {
+      deletedPerson = await Person.findOneAndDelete({
+        userId: user._id,
+        name: new RegExp(`^${id.trim().replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i'),
+      });
+    }
+
+    if (deletedPerson) {
+      await LedgerTransaction.deleteMany({ personId: deletedPerson._id, userId: user._id });
+    } else if (id && mongoose.isValidObjectId(id)) {
+      await LedgerTransaction.deleteMany({ personId: id, userId: user._id });
+    }
 
     res.json({ success: true, message: 'Contact and transactions deleted' });
   } catch (error) {
