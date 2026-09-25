@@ -204,3 +204,19 @@ exports.settleContact = async (req, res) => {
     res.status(500).json({ success: false, message: error.message });
   }
 };
+
+exports.deleteContact = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const user = await getRequestUser(req);
+
+    await Person.findOneAndDelete({ _id: id, userId: user._id });
+    await LedgerTransaction.deleteMany({ personId: id, userId: user._id });
+
+    res.json({ success: true, message: 'Contact and transactions deleted' });
+  } catch (error) {
+    console.error('Error deleting contact:', error);
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+

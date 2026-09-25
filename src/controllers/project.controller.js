@@ -37,7 +37,7 @@ exports.getProjects = async (req, res) => {
 exports.createProject = async (req, res) => {
   try {
     const user = await getRequestUser(req);
-    const { clientName, projectTitle, totalValue, notes, initialPayment = 0, addToIncome = true } = req.body;
+    const { clientName, projectTitle, totalValue, notes, initialPayment = 0, addToIncome = true, paymentDate } = req.body;
 
     if (!clientName || !clientName.trim()) {
       return res.status(400).json({ success: false, message: 'Client name is required' });
@@ -50,11 +50,14 @@ exports.createProject = async (req, res) => {
 
     const initPay = Number(initialPayment) || 0;
     const payments = [];
+    const payDateStr = paymentDate && !isNaN(new Date(paymentDate).getTime())
+      ? new Date(paymentDate).toISOString()
+      : new Date().toISOString();
+
     if (initPay > 0) {
-      const nowStr = new Date().toISOString();
       payments.push({
         amount: initPay,
-        date: nowStr,
+        date: payDateStr,
         note: 'Advance payment',
         method: 'UPI',
         recordedAsIncome: Boolean(addToIncome),
@@ -71,6 +74,7 @@ exports.createProject = async (req, res) => {
       payments,
       status,
       notes: (notes && notes.trim()) || '',
+      createdAt: paymentDate && !isNaN(new Date(paymentDate).getTime()) ? new Date(paymentDate) : new Date(),
     });
 
     res.status(201).json({
@@ -87,7 +91,7 @@ exports.addPayment = async (req, res) => {
   try {
     const user = await getRequestUser(req);
     const { id } = req.params;
-    const { amount, note, method = 'UPI', addToIncome = true } = req.body;
+    const { amount, note, method = 'UPI', addToIncome = true, paymentDate } = req.body;
 
     const payAmount = Number(amount);
     if (!payAmount || payAmount <= 0) {
@@ -99,7 +103,9 @@ exports.addPayment = async (req, res) => {
       return res.status(404).json({ success: false, message: 'Project not found' });
     }
 
-    const dateStr = new Date().toISOString();
+    const dateStr = paymentDate && !isNaN(new Date(paymentDate).getTime())
+      ? new Date(paymentDate).toISOString()
+      : new Date().toISOString();
     project.payments.unshift({
       amount: payAmount,
       date: dateStr,
@@ -142,3 +148,113 @@ exports.deleteProject = async (req, res) => {
     res.status(500).json({ success: false, message: error.message });
   }
 };
+
+exports.updateProject = async (req, res) => {
+  try {
+    const user = await getRequestUser(req);
+    const { id } = req.params;
+    const { clientName, projectTitle, totalValue, notes, createdAt } = req.body;
+
+    const project = await ClientProject.findOne({ _id: id, userId: user._id });
+    if (!project) {
+      return res.status(404).json({ success: false, message: 'Project not found' });
+    }
+
+    if (clientName && clientName.trim()) project.clientName = clientName.trim();
+    if (projectTitle && projectTitle.trim()) project.projectTitle = projectTitle.trim();
+    if (totalValue !== undefined) {
+      const val = Number(totalValue);
+      if (val > 0) project.totalValue = val;
+    }
+    if (notes !== undefined) project.notes = notes.trim();
+    if (createdAt) {
+      const d = new Date(createdAt);
+      if (!isNaN(d.getTime())) project.createdAt = d;
+    }
+
+    const totalPaid = (project.payments || []).reduce((sum, p) => sum + p.amount, 0);
+    project.status = totalPaid >= project.totalValue ? 'completed' : totalPaid > 0 ? 'payment_pending' : 'in_progress';
+
+    await project.save();
+
+    res.json({
+      success: true,
+      project: formatProject(project),
+    });
+  } catch (error) {
+    console.error('Error updating project:', error);
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+exports.updatePayment = async (req, res) => {
+  try {
+    const user = await getRequestUser(req);
+    const { id, paymentId } = req.params;
+    const { amount, note, method, recordedAsIncome, date } = req.body;
+
+    const project = await ClientProject.findOne({ _id: id, userId: user._id });
+    if (!project) {
+      return res.status(404).json({ success: false, message: 'Project not found' });
+    }
+
+    const payment = (project.payments || []).find(
+      (p) => p._id.toString() === paymentId || p.id === paymentId
+    );
+    if (!payment) {
+      return res.status(404).json({ success: false, message: 'Payment milestone not found' });
+    }
+
+    if (amount !== undefined) {
+      const val = Number(amount);
+      if (val > 0) payment.amount = val;
+    }
+    if (note !== undefined) payment.note = note.trim();
+    if (method !== undefined) payment.method = method;
+    if (recordedAsIncome !== undefined) payment.recordedAsIncome = Boolean(recordedAsIncome);
+    if (date !== undefined) payment.date = date;
+
+    const totalPaid = project.payments.reduce((sum, p) => sum + p.amount, 0);
+    project.status = totalPaid >= project.totalValue ? 'completed' : totalPaid > 0 ? 'payment_pending' : 'in_progress';
+
+    await project.save();
+
+    res.json({
+      success: true,
+      project: formatProject(project),
+    });
+  } catch (error) {
+    console.error('Error updating payment:', error);
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+exports.deletePayment = async (req, res) => {
+  try {
+    const user = await getRequestUser(req);
+    const { id, paymentId } = req.params;
+
+    const project = await ClientProject.findOne({ _id: id, userId: user._id });
+    if (!project) {
+      return res.status(404).json({ success: false, message: 'Project not found' });
+    }
+
+    project.payments = (project.payments || []).filter(
+      (p) => p._id.toString() !== paymentId && p.id !== paymentId
+    );
+
+    const totalPaid = project.payments.reduce((sum, p) => sum + p.amount, 0);
+    project.status = totalPaid >= project.totalValue ? 'completed' : totalPaid > 0 ? 'payment_pending' : 'in_progress';
+
+    await project.save();
+
+    res.json({
+      success: true,
+      project: formatProject(project),
+    });
+  } catch (error) {
+    console.error('Error deleting payment:', error);
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
