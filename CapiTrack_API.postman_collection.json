@@ -1,0 +1,275 @@
+{
+  "info": {
+    "_postman_id": "7f652b12-a894-4d89-9a2c-154784a92c3d",
+    "name": "CapiTrack API Collection",
+    "description": "Postman Collection for CapiTrack - Personal Expense Tracker & Udhaar Khata Ledger API",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "base_url",
+      "value": "http://localhost:5001",
+      "type": "string"
+    }
+  ],
+  "item": [
+    {
+      "name": "Health Check",
+      "item": [
+        {
+          "name": "Check Health",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/health",
+              "host": ["{{base_url}}"],
+              "path": ["api", "health"]
+            },
+            "description": "Verifies that the CapiTrack backend service is up and running."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Dashboard & Insights",
+      "item": [
+        {
+          "name": "Get Dashboard Summary",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/dashboard/summary",
+              "host": ["{{base_url}}"],
+              "path": ["api", "dashboard", "summary"]
+            },
+            "description": "Returns today's spend (₹340), yesterday's spend & delta percentage, AI insight line, and total receivables (owed to you) vs payables (you owe)."
+          },
+          "response": []
+        },
+        {
+          "name": "Get Monthly Insights",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/dashboard/insights?month=9&year=2026",
+              "host": ["{{base_url}}"],
+              "path": ["api", "dashboard", "insights"],
+              "query": [
+                {
+                  "key": "month",
+                  "value": "9"
+                },
+                {
+                  "key": "year",
+                  "value": "2026"
+                }
+              ]
+            },
+            "description": "Aggregates spend distribution by category for the insights bar chart and highlights the top spend category."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Expenses",
+      "item": [
+        {
+          "name": "Get Expenses List",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/expenses",
+              "host": ["{{base_url}}"],
+              "path": ["api", "expenses"]
+            },
+            "description": "Retrieves all expense entries grouped chronologically by day (Today, Yesterday, DD MMM)."
+          },
+          "response": []
+        },
+        {
+          "name": "Create Expense",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"amount\": 150,\n  \"category\": \"Food\",\n  \"note\": \"Lunch with team\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/expenses",
+              "host": ["{{base_url}}"],
+              "path": ["api", "expenses"]
+            },
+            "description": "Logs a new expense with an amount, category (Food, Travel, Grocery, Fun, Health, Other), and optional note."
+          },
+          "response": []
+        },
+        {
+          "name": "Delete Expense",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/expenses/EXPENSE_ID_HERE",
+              "host": ["{{base_url}}"],
+              "path": ["api", "expenses", "EXPENSE_ID_HERE"]
+            },
+            "description": "Removes an expense entry by its ID."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Ledger (Udhaar Khata)",
+      "item": [
+        {
+          "name": "Get Contacts List",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/ledger/contacts",
+              "host": ["{{base_url}}"],
+              "path": ["api", "ledger", "contacts"]
+            },
+            "description": "Returns all khata contacts with their current net balance and pending/settled status."
+          },
+          "response": []
+        },
+        {
+          "name": "Get Contact Detail & History",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/ledger/contacts/CONTACT_ID_HERE",
+              "host": ["{{base_url}}"],
+              "path": ["api", "ledger", "contacts", "CONTACT_ID_HERE"]
+            },
+            "description": "Returns a single contact's profile along with their complete chronological transaction timeline."
+          },
+          "response": []
+        },
+        {
+          "name": "Add Transaction - I Lent",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"personName\": \"Akssh\",\n  \"amount\": 1400,\n  \"type\": \"LENT\",\n  \"note\": \"Lent — cash for rent\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/ledger/transactions",
+              "host": ["{{base_url}}"],
+              "path": ["api", "ledger", "transactions"]
+            },
+            "description": "Records money lent to a contact, increasing their positive net balance."
+          },
+          "response": []
+        },
+        {
+          "name": "Add Transaction - I Borrowed",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"personName\": \"Sahil\",\n  \"amount\": 900,\n  \"type\": \"BORROWED\",\n  \"note\": \"Borrowed for cab\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/ledger/transactions",
+              "host": ["{{base_url}}"],
+              "path": ["api", "ledger", "transactions"]
+            },
+            "description": "Records money borrowed from a contact, decreasing their net balance into negative territory."
+          },
+          "response": []
+        },
+        {
+          "name": "Settle Contact Balance",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/ledger/contacts/CONTACT_ID_HERE/settle",
+              "host": ["{{base_url}}"],
+              "path": ["api", "ledger", "contacts", "CONTACT_ID_HERE", "settle"]
+            },
+            "description": "Clears a contact's remaining balance to zero and logs a SETTLEMENT transaction entry."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "User & Preferences",
+      "item": [
+        {
+          "name": "Get User Profile",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/user/profile",
+              "host": ["{{base_url}}"],
+              "path": ["api", "user", "profile"]
+            },
+            "description": "Retrieves the current user's settings, preferred language, and currency."
+          },
+          "response": []
+        },
+        {
+          "name": "Update Preferences & Language",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"preferredLanguage\": \"hi\",\n  \"autoCaptureEnabled\": true,\n  \"darkMode\": false\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/user/preferences",
+              "host": ["{{base_url}}"],
+              "path": ["api", "user", "preferences"]
+            },
+            "description": "Updates user language (en, hi, hinglish, mr, gu, ta, kn, bn) and toggles for auto-capture or dark mode."
+          },
+          "response": []
+        }
+      ]
+    }
+  ]
+}
